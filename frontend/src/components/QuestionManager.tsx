@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Modal, Form, ListGroup, Col, Row, Alert } from 'react-bootstrap';
+import { Button, Form, ListGroup, Col, Row, Alert } from 'react-bootstrap';
 import { authFetch } from '../utils/authFetch';
 
 interface Question {
@@ -24,8 +24,8 @@ const QuestionManager: React.FC = () => {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [showForm, setShowForm] = useState(false);
 
   const initialFormState = {
     label: '',
@@ -69,30 +69,32 @@ const QuestionManager: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleShowModal = (question: Question | null = null) => {
-    if (question) {
-      setEditingQuestion(question);
-      setFormData({
-        label: question.label,
-        answer1: question.answer1,
-        answer2: question.answer2,
-        answer3: question.answer3,
-        answer4: question.answer4,
-        correctAnswer: question.correctAnswer,
-        themeId: question.themeId,
-      });
-    } else {
-      setEditingQuestion(null);
-      setFormData(initialFormState);
-      if (themes.length > 0) {
-        setFormData(prev => ({ ...prev, themeId: themes[0].id }));
-      }
-    }
-    setShowModal(true);
+  const handleEdit = (question: Question) => {
+    setEditingQuestion(question);
+    setFormData({
+      label: question.label,
+      answer1: question.answer1,
+      answer2: question.answer2,
+      answer3: question.answer3,
+      answer4: question.answer4,
+      correctAnswer: question.correctAnswer,
+      themeId: question.themeId,
+    });
+    setShowForm(true);
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
+  const handleAddNew = () => {
+    setEditingQuestion(null);
+    const newFormState = { ...initialFormState };
+    if (themes.length > 0) {
+        newFormState.themeId = themes[0].id;
+    }
+    setFormData(newFormState);
+    setShowForm(true);
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
     setEditingQuestion(null);
     setFormData(initialFormState);
   };
@@ -113,7 +115,7 @@ const QuestionManager: React.FC = () => {
       }
 
       fetchData();
-      handleCloseModal();
+      handleCancel();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
     }
@@ -144,85 +146,86 @@ const QuestionManager: React.FC = () => {
 
   return (
     <>
-      <Button onClick={() => handleShowModal()} className="mb-3">Gérer les Questions</Button>
+      {error && <Alert variant="danger">{error}</Alert>}
+      
+      {!showForm && <Button onClick={handleAddNew} className="mb-3">Créer une nouvelle question</Button>}
 
-      <Modal show={showModal} onHide={handleCloseModal} size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>{editingQuestion ? 'Modifier' : 'Créer'} une Question</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {error && <Alert variant="danger">{error}</Alert>}
-          <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Question</Form.Label>
-              <Form.Control type="text" name="label" value={formData.label} onChange={handleChange} required />
-            </Form.Group>
-            <Row>
-                <Col md={6}>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Réponse 1</Form.Label>
-                        <Form.Control type="text" name="answer1" value={formData.answer1} onChange={handleChange} required />
-                    </Form.Group>
-                </Col>
-                <Col md={6}>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Réponse 2</Form.Label>
-                        <Form.Control type="text" name="answer2" value={formData.answer2} onChange={handleChange} required />
-                    </Form.Group>
-                </Col>
-            </Row>
-            <Row>
-                <Col md={6}>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Réponse 3</Form.Label>
-                        <Form.Control type="text" name="answer3" value={formData.answer3} onChange={handleChange} required />
-                    </Form.Group>
-                </Col>
-                <Col md={6}>
-                    <Form.Group className="mb-3">
-                        <Form.Label>Réponse 4</Form.Label>
-                        <Form.Control type="text" name="answer4" value={formData.answer4} onChange={handleChange} required />
-                    </Form.Group>
-                </Col>
-            </Row>
-            <Form.Group className="mb-3">
-              <Form.Label>Bonne réponse</Form.Label>
-              <div className="d-flex">
-                {[1, 2, 3, 4].map(num => (
-                  <Form.Check key={num} type="radio" name="correctAnswer" label={`Réponse ${num}`} value={num} checked={formData.correctAnswer === num} onChange={handleChange} className="me-3" />
-                ))}
-              </div>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Thème</Form.Label>
-              <Form.Select name="themeId" value={formData.themeId} onChange={handleChange}>
-                {themes.map(theme => (
-                  <option key={theme.id} value={theme.id}>{theme.name}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-            <Button variant="primary" type="submit">Sauvegarder</Button>
-          </Form>
-          <hr />
-          <h5>Questions existantes</h5>
-          {loading ? <p>Chargement...</p> :
-            <ListGroup>
-              {questions.map(q => (
-                <ListGroup.Item key={q.id} className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>{q.label}</strong>
-                    <small className="d-block text-muted">Thème: {q.theme.name}</small>
-                  </div>
-                  <div>
-                    <Button variant="outline-primary" size="sm" onClick={() => handleShowModal(q)} className="me-2">Modifier</Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(q.id)}>Supprimer</Button>
-                  </div>
-                </ListGroup.Item>
+      {showForm && (
+        <Form onSubmit={handleSubmit} className="mb-4 p-3 border rounded">
+          <h5 className="mb-3">{editingQuestion ? 'Modifier la question' : 'Créer une question'}</h5>
+          <Form.Group className="mb-3">
+            <Form.Label>Question</Form.Label>
+            <Form.Control type="text" name="label" value={formData.label} onChange={handleChange} required />
+          </Form.Group>
+          <Row>
+              <Col md={6}>
+                  <Form.Group className="mb-3">
+                      <Form.Label>Réponse 1</Form.Label>
+                      <Form.Control type="text" name="answer1" value={formData.answer1} onChange={handleChange} required />
+                  </Form.Group>
+              </Col>
+              <Col md={6}>
+                  <Form.Group className="mb-3">
+                      <Form.Label>Réponse 2</Form.Label>
+                      <Form.Control type="text" name="answer2" value={formData.answer2} onChange={handleChange} required />
+                  </Form.Group>
+              </Col>
+          </Row>
+          <Row>
+              <Col md={6}>
+                  <Form.Group className="mb-3">
+                      <Form.Label>Réponse 3</Form.Label>
+                      <Form.Control type="text" name="answer3" value={formData.answer3} onChange={handleChange} required />
+                  </Form.Group>
+              </Col>
+              <Col md={6}>
+                  <Form.Group className="mb-3">
+                      <Form.Label>Réponse 4</Form.Label>
+                      <Form.Control type="text" name="answer4" value={formData.answer4} onChange={handleChange} required />
+                  </Form.Group>
+              </Col>
+          </Row>
+          <Form.Group className="mb-3">
+            <Form.Label>Bonne réponse</Form.Label>
+            <div className="d-flex">
+              {[1, 2, 3, 4].map(num => (
+                <Form.Check key={num} type="radio" name="correctAnswer" label={`Réponse ${num}`} value={num} checked={formData.correctAnswer === num} onChange={handleChange} className="me-3" />
               ))}
-            </ListGroup>
-          }
-        </Modal.Body>
-      </Modal>
+            </div>
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Thème</Form.Label>
+            <Form.Select name="themeId" value={formData.themeId} onChange={handleChange} disabled={themes.length === 0}>
+              {themes.length > 0 ? themes.map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.name}</option>
+              )) : <option>Veuillez d'abord créer un thème</option>}
+            </Form.Select>
+          </Form.Group>
+          <div className="d-flex justify-content-end">
+              <Button variant="secondary" onClick={handleCancel} className="me-2">Annuler</Button>
+              <Button variant="primary" type="submit">Sauvegarder</Button>
+          </div>
+        </Form>
+      )}
+
+      <hr />
+      <h5>Questions existantes</h5>
+      {loading ? <p>Chargement...</p> : (
+        <ListGroup>
+          {questions.map(q => (
+            <ListGroup.Item key={q.id} className="d-flex justify-content-between align-items-center">
+              <div>
+                <strong>{q.label}</strong>
+                <small className="d-block text-muted">Thème: {q.theme.name}</small>
+              </div>
+              <div>
+                <Button variant="outline-primary" size="sm" onClick={() => handleEdit(q)} className="me-2">Modifier</Button>
+                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(q.id)}>Supprimer</Button>
+              </div>
+            </ListGroup.Item>
+          ))}
+        </ListGroup>
+      )}
     </>
   );
 };

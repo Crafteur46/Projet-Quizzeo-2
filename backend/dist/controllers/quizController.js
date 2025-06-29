@@ -63,7 +63,7 @@ const updateTheme = async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
     try {
-        const theme = await prisma.theme.update({
+        const theme = await prisma.theme.update({ 
             where: { id: Number(id) },
             data: { name },
         });

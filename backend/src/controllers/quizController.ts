@@ -68,6 +68,7 @@ export const deleteTheme = async (req: Request, res: Response, next: NextFunctio
         await prisma.theme.delete({ where: { id: Number(id) } });
         res.status(204).send();
     } catch (error) {
+                console.error('Failed to delete theme:', error);
         res.status(500).json({ error: 'La suppression du thème a échoué.' });
     }
 };

@@ -1,123 +1,138 @@
 import React, { useState, useEffect } from 'react';
+import { Button, Form, ListGroup, Alert, Col, Row } from 'react-bootstrap';
 import { authFetch } from '../utils/authFetch';
-import { Button, Modal, Form, ListGroup, InputGroup, FormControl } from 'react-bootstrap';
 
 interface Theme {
-  id: number;
-  name: string;
+    id: number;
+    name: string;
 }
 
 const ThemeManager: React.FC = () => {
-  const [themes, setThemes] = useState<Theme[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [newThemeName, setNewThemeName] = useState('');
-  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+    const [themes, setThemes] = useState<Theme[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+    const [themeName, setThemeName] = useState('');
+    const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    fetchThemes();
-  }, []);
-
-  const fetchThemes = async () => {
-    try {
-        const response = await fetch('/api/quizzes/themes'); // This is a public route, no auth needed
-        if (!response.ok) {
-            throw new Error('Failed to fetch themes');
+    const fetchThemes = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch('/api/quizzes/themes');
+            if (!response.ok) throw new Error('Erreur lors de la récupération des thèmes');
+            const data = await response.json();
+            setThemes(data);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
         }
-        const data = await response.json();
-        setThemes(data);
-    } catch (error) {
-        console.error(error);
-    }
-  };
+    };
 
-  const handleCreateTheme = async () => {
-    if (!newThemeName) return;
-    try {
-      await authFetch('/api/quizzes/themes', {
-        method: 'POST',
-        body: JSON.stringify({ name: newThemeName }),
-      });
-      setNewThemeName('');
-      fetchThemes();
-    } catch (error) {
-      console.error('Failed to create theme:', error);
-    }
-  };
+    useEffect(() => {
+        fetchThemes();
+    }, []);
 
-  const handleUpdateTheme = async () => {
-    if (!editingTheme) return;
-    try {
-      await authFetch(`/api/quizzes/themes/${editingTheme.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name: editingTheme.name })
-      });
-      setEditingTheme(null);
-      fetchThemes();
-    } catch (error) {
-      console.error('Failed to update theme:', error);
-    }
-  };
+    const handleEdit = (theme: Theme) => {
+        setEditingTheme(theme);
+        setThemeName(theme.name);
+        setShowForm(true);
+    };
 
-  const handleDeleteTheme = async (id: number) => {
-    try {
-      await authFetch(`/api/quizzes/themes/${id}`, {
-        method: 'DELETE',
-      });
-      fetchThemes();
-    } catch (error) {
-      console.error('Failed to delete theme:', error);
-    }
-  };
+    const handleAddNew = () => {
+        setEditingTheme(null);
+        setThemeName('');
+        setShowForm(true);
+    };
+    
+    const handleCancel = () => {
+        setShowForm(false);
+        setEditingTheme(null);
+        setThemeName('');
+    };
 
-  return (
-    <>
-      <Button onClick={() => setShowModal(true)} variant="primary" className="mb-3">Gérer les thèmes</Button>
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        const url = editingTheme ? `/api/quizzes/themes/${editingTheme.id}` : '/api/quizzes/themes';
+        const method = editingTheme ? 'PUT' : 'POST';
 
-      <Modal show={showModal} onHide={() => setShowModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Gestion des thèmes</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Nouveau thème</Form.Label>
-            <InputGroup>
-              <FormControl
-                placeholder="Nom du thème"
-                value={newThemeName}
-                onChange={(e) => setNewThemeName(e.target.value)}
-              />
-              <Button variant="outline-secondary" onClick={handleCreateTheme}>Créer</Button>
-            </InputGroup>
-          </Form.Group>
+        try {
+            const response = await authFetch(url, {
+                method,
+                body: JSON.stringify({ name: themeName }),
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'L\'opération a échoué.');
+            }
+            fetchThemes();
+            handleCancel();
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
 
-          <ListGroup>
-            {themes.map(theme => (
-              <ListGroup.Item key={theme.id}>
-                {editingTheme?.id === theme.id ? (
-                  <InputGroup>
-                    <FormControl
-                      value={editingTheme.name}
-                      onChange={(e) => setEditingTheme({ ...editingTheme, name: e.target.value })}
-                    />
-                    <Button variant="outline-secondary" onClick={handleUpdateTheme}>Sauvegarder</Button>
-                    <Button variant="outline-danger" onClick={() => setEditingTheme(null)}>Annuler</Button>
-                  </InputGroup>
-                ) : (
-                  <div className="d-flex justify-content-between align-items-center">
-                    {theme.name}
-                    <div>
-                      <Button variant="link" onClick={() => setEditingTheme(theme)}>Modifier</Button>
-                      <Button variant="link" className="text-danger" onClick={() => handleDeleteTheme(theme.id)}>Supprimer</Button>
+    const handleDelete = async (id: number) => {
+        if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce thème ? Toutes les questions et quizz associés seront également supprimés.')) return;
+        setError(null);
+        try {
+            const response = await authFetch(`/api/quizzes/themes/${id}`, { method: 'DELETE' });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'La suppression a échoué.');
+            }
+            fetchThemes();
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
+    return (
+        <>
+            {error && <Alert variant="danger">{error}</Alert>}
+            
+            {!showForm && <Button onClick={handleAddNew} className="mb-3">Créer un nouveau thème</Button>}
+
+            {showForm && (
+                <Form onSubmit={handleSubmit} className="mb-4 p-3 border rounded">
+                    <h5 className="mb-3">{editingTheme ? 'Modifier le thème' : 'Créer un thème'}</h5>
+                    <Form.Group as={Row} className="mb-3">
+                        <Form.Label column sm={2}>Nom</Form.Label>
+                        <Col sm={10}>
+                            <Form.Control
+                                type="text"
+                                value={themeName}
+                                onChange={e => setThemeName(e.target.value)}
+                                required
+                            />
+                        </Col>
+                    </Form.Group>
+                    <div className="d-flex justify-content-end">
+                        <Button variant="secondary" onClick={handleCancel} className="me-2">Annuler</Button>
+                        <Button variant="primary" type="submit">Sauvegarder</Button>
                     </div>
-                  </div>
-                )}
-              </ListGroup.Item>
-            ))}
-          </ListGroup>
-        </Modal.Body>
-      </Modal>
-    </>
-  );
+                </Form>
+            )}
+
+            <hr />
+
+            <h5>Thèmes Existants</h5>
+            {loading ? <p>Chargement...</p> : (
+                <ListGroup>
+                    {themes.map(theme => (
+                        <ListGroup.Item key={theme.id} className="d-flex justify-content-between align-items-center">
+                            {theme.name}
+                            <div>
+                                <Button variant="outline-primary" size="sm" onClick={() => handleEdit(theme)} className="me-2">Modifier</Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleDelete(theme.id)}>Supprimer</Button>
+                            </div>
+                        </ListGroup.Item>
+                    ))}
+                </ListGroup>
+            )}
+        </>
+    );
 };
 
 export default ThemeManager;
