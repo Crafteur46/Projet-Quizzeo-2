@@ -6,53 +6,53 @@ import jwt from 'jsonwebtoken';
 const prisma = new PrismaClient();
 
 export const register: RequestHandler = async (req, res) => {
-  const { pseudo, password } = req.body;
+  const { email, password } = req.body;
 
-  if (!pseudo || !password) {
-    res.status(400).json({ message: 'Pseudo and password are required' });
+  if (!email || !password) {
+    res.status(400).json({ message: 'L\'email et le mot de passe sont requis.' });
     return;
   }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { pseudo } });
-    if (existingUser) {
-        res.status(400).json({ message: 'User already exists' });
+    const existingUserByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingUserByEmail) {
+        res.status(400).json({ message: 'Cet email est déjà utilisé.' });
         return;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
-        pseudo,
+        email,
         password: hashedPassword,
       },
     });
-    res.status(201).json({ message: 'User created successfully', userId: user.id });
+    res.status(201).json({ message: 'Utilisateur créé avec succès', userId: user.id });
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong' });
+    res.status(500).json({ message: 'Une erreur est survenue lors de la création de l\'utilisateur.' });
   }
 };
 
 export const login: RequestHandler = async (req, res) => {
-  const { pseudo, password } = req.body;
+  const { email, password } = req.body;
 
-  if (!pseudo || !password) {
-    res.status(400).json({ message: 'Pseudo and password are required' });
+  if (!email || !password) {
+    res.status(400).json({ message: 'L\'email et le mot de passe sont requis.' });
     return;
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { pseudo } });
+    const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      res.status(401).json({ message: 'Invalid credentials' });
+      res.status(401).json({ message: 'Email ou mot de passe incorrect.' });
       return;
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
-      res.status(401).json({ message: 'Invalid credentials' });
+      res.status(401).json({ message: 'Email ou mot de passe incorrect.' });
       return;
     }
 
@@ -67,6 +67,6 @@ export const login: RequestHandler = async (req, res) => {
 
     res.json({ token });
   } catch (error) {
-    res.status(500).json({ message: 'Something went wrong' });
+    res.status(500).json({ message: 'Une erreur est survenue.' });
   }
 };

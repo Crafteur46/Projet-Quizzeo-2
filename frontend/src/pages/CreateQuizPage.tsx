@@ -1,147 +1,188 @@
 import React, { useState } from 'react';
-import './CreateQuizPage.css';
+import { useNavigate } from 'react-router-dom';
+import { Container, Form, Button, Alert, Card, Row, Col, Spinner } from 'react-bootstrap';
 
-interface QuizFormData {
-  themeId: number;
-  questions: number[];
+interface QuestionFormData {
+  label: string;
+  answer1: string;
+  answer2: string;
+  answer3: string;
+  answer4: string;
+  correctAnswer: number | '';
 }
 
 const CreateQuizPage: React.FC = () => {
-  const [formData, setFormData] = useState<QuizFormData>({
-    themeId: 0,
-    questions: []
-  });
-  const [themes, setThemes] = useState<any[]>([]);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [themeName, setThemeName] = useState('');
+  const [questions, setQuestions] = useState<QuestionFormData[]>(
+    Array(10).fill(0).map(() => ({
+      label: '',
+      answer1: '',
+      answer2: '',
+      answer3: '',
+      answer4: '',
+      correctAnswer: '',
+    }))
+  );
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Charger les thèmes disponibles
-  React.useEffect(() => {
-    const fetchThemes = async () => {
-      try {
-        const response = await fetch('/api/themes');
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        const data = await response.json();
-        setThemes(data);
-      } catch (err) {
-        console.error('Error fetching themes:', err);
+  const handleQuestionChange = (index: number, field: keyof QuestionFormData, value: string | number) => {
+    const newQuestions = [...questions];
+    newQuestions[index] = { ...newQuestions[index], [field]: value };
+    setQuestions(newQuestions);
+  };
+
+  const validateForm = () => {
+    if (!themeName.trim()) {
+      setError('Le nom du thème est requis.');
+      return false;
+    }
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.label.trim() || !q.answer1.trim() || !q.answer2.trim() || !q.answer3.trim() || !q.answer4.trim()) {
+        setError(`La question ${i + 1} est incomplète. Tous les champs de réponse sont requis.`);
+        return false;
       }
-    };
-    fetchThemes();
-  }, []);
+      if (q.correctAnswer === '') {
+        setError(`Veuillez sélectionner la bonne réponse pour la question ${i + 1}.`);
+        return false;
+      }
+    }
+    setError('');
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
     setError('');
     setSuccess('');
+
     try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        themeName,
+        questions: questions.map(q => ({ ...q, correctAnswer: Number(q.correctAnswer) })),
+      };
+
       const response = await fetch('/api/quizzes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create quiz');
+        throw new Error(errorData.error || 'La création du quiz a échoué.');
       }
 
-      setSuccess('Quiz created successfully!');
-      setFormData({ themeId: 0, questions: [] });
+      setSuccess('Quiz créé avec succès ! Vous allez être redirigé...');
+      setTimeout(() => navigate('/'), 2000);
     } catch (err: any) {
-      setError(err.message || 'Error creating quiz. Please try again.');
-    }
-  };
-
-  const handleThemeChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const themeId = parseInt(e.target.value);
-    setFormData(prev => ({ ...prev, themeId, questions: [] }));
-
-    if (isNaN(themeId) || !themeId) {
-        setQuestions([]);
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/questions?themeId=${themeId}`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch questions');
-        }
-        const data = await response.json();
-        setQuestions(data);
-    } catch (err) {
-        console.error('Error fetching questions:', err);
-        setQuestions([]);
-    }
-  };
-
-  const handleQuestionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const questionId = parseInt(e.target.value);
-    if (!formData.questions.includes(questionId)) {
-      setFormData(prev => ({
-        ...prev,
-        questions: [...prev.questions, questionId]
-      }));
+      setError(err.message || 'Une erreur inattendue est survenue.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="create-quiz-container">
-      <h2>Create a new Quiz</h2>
-      {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
-      <form onSubmit={handleSubmit} className="quiz-form">
-        <div className="form-group">
-          <label htmlFor="theme">Select Theme:</label>
-          <select
-            id="theme"
-            value={formData.themeId}
-            onChange={handleThemeChange}
-            required
-          >
-            <option value="">Select a theme</option>
-            {themes.map(theme => (
-              <option key={theme.id} value={theme.id}>
-                {theme.name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <Container className="mt-5">
+      <Row className="justify-content-md-center">
+        <Col xs={12} md={10} lg={8}>
+          <Card>
+            <Card.Body>
+              <h2 className="text-center mb-4">Créer un nouveau Quiz</h2>
+              {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
+              {success && <Alert variant="success">{success}</Alert>}
+              <Form onSubmit={handleSubmit}>
+                <Form.Group className="mb-4" controlId="themeName">
+                  <Form.Label><h3>Nom du Thème</h3></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="themeName"
+                    value={themeName}
+                    onChange={(e) => setThemeName(e.target.value)}
+                    required
+                    placeholder="Ex: Histoire de France"
+                  />
+                </Form.Group>
 
-        <div className="form-group">
-          <label>Available Questions:</label>
-          <select
-            onChange={handleQuestionChange}
-            required
-          >
-            <option value="">Select a question</option>
-            {questions.map(question => (
-              <option key={question.id} value={question.id}>
-                {question.label}
-              </option>
-            ))}
-          </select>
-        </div>
+                {questions.map((q, index) => (
+                  <Card key={index} className="mb-3">
+                    <Card.Header as="h5">Question {index + 1}</Card.Header>
+                    <Card.Body>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Intitulé de la question</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={q.label}
+                          onChange={(e) => handleQuestionChange(index, 'label', e.target.value)}
+                          required
+                          placeholder={`Question ${index + 1}`}
+                        />
+                      </Form.Group>
+                      <Row>
+                        {[1, 2, 3, 4].map(num => (
+                          <Col md={6} key={num}>
+                            <Form.Group className="mb-3">
+                              <Form.Label>Réponse {num}</Form.Label>
+                              <Form.Control
+                                type="text"
+                                value={q[`answer${num}` as keyof QuestionFormData] as string}
+                                onChange={(e) => handleQuestionChange(index, `answer${num}` as keyof QuestionFormData, e.target.value)}
+                                required
+                              />
+                            </Form.Group>
+                          </Col>
+                        ))}
+                      </Row>
+                      <Form.Group>
+                        <Form.Label>Quelle est la bonne réponse ?</Form.Label>
+                        <div>
+                          {[1, 2, 3, 4].map(num => (
+                            <Form.Check
+                              key={num}
+                              inline
+                              type="radio"
+                              id={`q${index}-correct-answer-${num}`}
+                              label={`Réponse ${num}`}
+                              name={`correctAnswer-${index}`}
+                              checked={q.correctAnswer === num}
+                              onChange={() => handleQuestionChange(index, 'correctAnswer', num)}
+                              required
+                            />
+                          ))}
+                        </div>
+                      </Form.Group>
+                    </Card.Body>
+                  </Card>
+                ))}
 
-        <div className="selected-questions">
-          <h3>Selected Questions:</h3>
-          <ul>
-            {formData.questions.map(id => (
-              <li key={id}>
-                {questions.find(q => q.id === id)?.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <button type="submit" className="submit-btn">Create Quiz</button>
-      </form>
-    </div>
+                <div className="d-grid mt-4">
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    disabled={isLoading}
+                    size="lg"
+                  >
+                    {isLoading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : 'Créer le Quiz'}
+                  </Button>
+                </div>
+              </Form>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

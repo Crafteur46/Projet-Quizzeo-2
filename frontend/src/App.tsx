@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import QuizPage from './pages/QuizPage';
 import CreateQuizPage from './pages/CreateQuizPage';
 import HallOfFamePage from './pages/HallOfFamePage';
+import MyQuizzesPage from './pages/MyQuizzesPage';
 import './App.css';
 
 const App: React.FC = () => {
@@ -21,6 +22,7 @@ const App: React.FC = () => {
           <Route path="/quiz/:id" element={<QuizPage />} />
           <Route path="/create-quiz" element={<CreateQuizPage />} />
           <Route path="/hall-of-fame" element={<HallOfFamePage />} />
+            <Route path="/my-quizzes" element={<MyQuizzesPage />} />
         </Routes>
       </main>
     </Router>

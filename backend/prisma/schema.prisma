@@ -9,7 +9,7 @@ datasource db {
 
 model User {
   id        Int        @id @default(autoincrement())
-  pseudo    String     @unique
+  email     String     @unique
   password  String
   quizzes   Quiz[]     @relation("UserQuizzes")
   questions Question[] @relation("UserQuestions")
