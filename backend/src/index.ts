@@ -5,7 +5,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import quizRoutes from './routes/quizRoutes';
 
-dotenv.config();
+// dotenv.config(); // Désactivé car les variables d'environnement sont fournies par Docker Compose
 
 const app: Express = express();
 const port = process.env.BACKEND_PORT || 3001;

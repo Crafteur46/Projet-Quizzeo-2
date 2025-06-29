@@ -67,6 +67,7 @@ export const login: RequestHandler = async (req, res) => {
 
     res.json({ token });
   } catch (error) {
+        console.error('Login error:', error);
     res.status(500).json({ message: 'Une erreur est survenue.' });
   }
 };
