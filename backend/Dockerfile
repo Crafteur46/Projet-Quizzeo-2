@@ -6,14 +6,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy Prisma schema and generate the client
-COPY prisma ./prisma/
-RUN npx prisma generate
-
 # Copy the rest of the application source code
 COPY . .
 
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Build the TypeScript code
+RUN npm run build
+
 EXPOSE 3001
 
-# Start the application
-CMD ["npm", "run", "dev"]
+# Run the compiled JavaScript code
+CMD ["npm", "run", "start"]
