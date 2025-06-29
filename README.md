@@ -10,3 +10,5 @@ React qui permet de créer des interfaces utilisateur dynamiques pour des applic
 React-router qui permet une navigation dans la webapp. 
 
 Toute cette webapp est conteneurisée dans Docker, ce qui permet de lancer l'ensemble de l'application (frontend, backend et base de données) sur n'importe quelle machine.
+
+Bonne journée à vous et à mardi.
