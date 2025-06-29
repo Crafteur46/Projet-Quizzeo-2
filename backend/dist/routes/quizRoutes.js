@@ -5,44 +5,28 @@ const quizController_1 = require("../controllers/quizController");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
 // Routes pour les Thèmes
-router.get('/themes', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getThemes)(req, res)).catch(next);
-});
-router.post('/themes', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.createTheme)(req, res)).catch(next);
-});
-router.put('/themes/:id', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.updateTheme)(req, res)).catch(next);
-});
-router.delete('/themes/:id', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.deleteTheme)(req, res)).catch(next);
-});
+router.get('/themes', quizController_1.getThemes);
+router.post('/themes', auth_middleware_1.authenticate, quizController_1.createTheme);
+router.put('/themes/:id', auth_middleware_1.authenticate, quizController_1.updateTheme);
+router.delete('/themes/:id', auth_middleware_1.authenticate, quizController_1.deleteTheme);
 // Routes pour les Questions
-router.get('/questions', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getQuestionsByTheme)(req, res)).catch(next);
-});
-router.post('/questions', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.createQuestion)(req, res)).catch(next);
-});
+router.get('/questions', quizController_1.getQuestionsByTheme);
+router.get('/questions/created', auth_middleware_1.authenticate, quizController_1.getCreatedQuestions);
+router.post('/questions', auth_middleware_1.authenticate, quizController_1.createQuestion);
+router.put('/questions/:id', auth_middleware_1.authenticate, quizController_1.updateQuestion);
+router.delete('/questions/:id', auth_middleware_1.authenticate, quizController_1.deleteQuestion);
+// Route pour récupérer les propositions d'une question (ex: pour le mode 'duo')
+router.get('/questions/:id/propositions', auth_middleware_1.authenticate, quizController_1.getQuestionPropositions);
 // Routes pour les Quizzes
-router.get('/', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getQuizzes)(req, res)).catch(next);
-});
-router.get('/:id', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getQuizById)(req, res)).catch(next);
-});
-router.post('/', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.createQuiz)(req, res)).catch(next);
-});
+router.get('/', auth_middleware_1.authenticate, quizController_1.getQuizzes);
+router.get('/created', auth_middleware_1.authenticate, quizController_1.getCreatedQuizzes);
+router.get('/:id', auth_middleware_1.authenticate, quizController_1.getQuizById);
+router.post('/', auth_middleware_1.authenticate, quizController_1.createQuiz);
+router.put('/:id', auth_middleware_1.authenticate, quizController_1.updateQuiz);
+router.delete('/:id', auth_middleware_1.authenticate, quizController_1.deleteQuiz);
 // Route pour le jeu
-router.post('/submit', auth_middleware_1.authenticate, (req, res, next) => {
-    Promise.resolve((0, quizController_1.submitAnswer)(req, res)).catch(next);
-});
+router.post('/submit', auth_middleware_1.authenticate, quizController_1.submitAnswer);
 // Routes pour le Hall of Fame
-router.get('/hall-of-fame/global', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getGlobalHallOfFame)(req, res)).catch(next);
-});
-router.get('/hall-of-fame/:id', (req, res, next) => {
-    Promise.resolve((0, quizController_1.getQuizHallOfFame)(req, res)).catch(next);
-});
+router.get('/hall-of-fame/global', quizController_1.getGlobalHallOfFame);
+router.get('/hall-of-fame/:id', quizController_1.getQuizHallOfFame);
 exports.default = router;

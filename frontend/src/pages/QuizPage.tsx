@@ -26,11 +26,6 @@ interface AnswerFeedback {
   score: number;
 }
 
-// Helper function to shuffle an array
-const shuffleArray = (array: any[]) => {
-  return [...array].sort(() => Math.random() - 0.5);
-};
-
 const QuizPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -80,24 +75,17 @@ const QuizPage: React.FC = () => {
   }, [id, token]);
 
   // Effect to prepare answers for 'carré' mode
-  useEffect(() => {
-    if (quiz && answerMode === 'carré') {
-      const currentAnswers = quiz.questions[currentQuestionIndex].answers;
-      setDisplayedAnswers(shuffleArray(currentAnswers));
-    }
-  }, [answerMode, currentQuestionIndex, quiz]);
-
-  const handleModeSelect = async (mode: 'cash' | 'carré' | 'duo') => {
+    const handleModeSelect = async (mode: 'cash' | 'carré' | 'duo') => {
     setAnswerMode(mode);
-    if (mode === 'duo' && quiz) {
+    if ((mode === 'duo' || mode === 'carré') && quiz) {
       setLoading(true);
       try {
         const questionId = quiz.questions[currentQuestionIndex].id;
-        const response = await fetch(`http://localhost:3001/api/quizzes/questions/${questionId}/propositions?mode=duo`, {
+        const response = await fetch(`http://localhost:3001/api/quizzes/questions/${questionId}/propositions?mode=${mode}`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!response.ok) {
-          throw new Error('Impossible de charger les propositions pour le mode duo.');
+          throw new Error(`Impossible de charger les propositions pour le mode ${mode}.`);
         }
         const data = await response.json();
         setDisplayedAnswers(data);

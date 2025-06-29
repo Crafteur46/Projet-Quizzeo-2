@@ -1,5 +1,9 @@
-declare namespace Express {
+import { User } from '@prisma/client';
+
+declare global {
+  namespace Express {
     export interface Request {
-        currentUser?: { id: number };
+      currentUser?: User;
     }
+  }
 }

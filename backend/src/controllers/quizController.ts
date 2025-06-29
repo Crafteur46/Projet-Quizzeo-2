@@ -1,3 +1,4 @@
+import * as stringSimilarity from 'string-similarity';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient, Question } from '@prisma/client';
 
@@ -129,17 +130,63 @@ export const deleteQuestion = async (req: Request, res: Response, next: NextFunc
     }
 };
 
+// Helper function to shuffle an array
+const shuffle = <T>(array: T[]): T[] => {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+};
+
 export const getQuestionPropositions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { mode } = req.query;
+    const { id } = req.params;
+
+    if (mode !== 'duo' && mode !== 'carré') {
+        res.status(400).json({ message: "Ce mode n'est pas supporté pour cette fonctionnalité." });
+        return;
+    }
+
     try {
         const question = await prisma.question.findUnique({
-            where: { id: Number(req.params.id) },
-            select: { id: true, label: true, answer1: true, answer2: true, answer3: true, answer4: true },
+            where: { id: Number(id) },
         });
-        if (!question) {
-            res.status(404).json({ error: 'Question non trouvée.' });
+
+        if (!question || typeof question.correctAnswer !== 'number' || !question.answer1 || !question.answer2 || !question.answer3 || !question.answer4) {
+            res.status(404).json({ error: 'Question non trouvée ou mal configurée.' });
             return;
         }
-        res.json(question);
+
+        const allAnswers = [
+            { id: 1, text: question.answer1 },
+            { id: 2, text: question.answer2 },
+            { id: 3, text: question.answer3 },
+            { id: 4, text: question.answer4 },
+        ];
+
+        const correctAnswer = allAnswers.find(a => a.id === question.correctAnswer);
+        const incorrectAnswers = allAnswers.filter(a => a.id !== question.correctAnswer);
+
+        if (!correctAnswer) {
+             res.status(500).json({ error: 'Configuration de la réponse correcte invalide.' });
+             return;
+        }
+
+        let propositions: { id: number; text: string; }[] = [];
+
+        if (mode === 'carré') {
+            propositions = shuffle(allAnswers);
+        } else if (mode === 'duo') {
+            if (incorrectAnswers.length < 1) {
+                res.status(400).json({ message: "Pas assez de mauvaises réponses pour le mode duo." });
+                return;
+            }
+            const randomIncorrectAnswer = shuffle(incorrectAnswers)[0];
+            propositions = shuffle([correctAnswer, randomIncorrectAnswer]);
+        }
+
+        res.json(propositions);
     } catch (error) {
         next(error);
     }
@@ -150,17 +197,50 @@ export const getQuestionPropositions = async (req: Request, res: Response, next:
 // =================================================================
 
 export const createQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { title, theme, questions } = req.body as { title: string; theme: string; questions: Question[] };
+    const { title, theme, questions } = req.body as {
+        title: string;
+        theme: string;
+        questions: {
+            label: string;
+            answer1: string;
+            answer2: string;
+            answer3: string;
+            answer4: string;
+            correctAnswer: number;
+        }[];
+    };
+
     if (!req.currentUser) {
         res.status(401).json({ error: 'Utilisateur non authentifié.' });
         return;
     }
+
+    if (!title || !theme || !questions || !Array.isArray(questions) || questions.length === 0) {
+        res.status(400).json({ error: 'Les données du quiz sont incomplètes ou invalides.' });
+        return;
+    }
+
     try {
         const newQuiz = await prisma.$transaction(async (tx) => {
             const newTheme = await tx.theme.upsert({ where: { name: theme }, update: {}, create: { name: theme } });
+
             const createdQuestions = await Promise.all(
-                questions.map((q) => tx.question.create({ data: { ...q, themeId: newTheme.id, creatorId: req.currentUser!.id } }))
+                questions.map((q) =>
+                    tx.question.create({
+                        data: {
+                            label: q.label,
+                            answer1: q.answer1,
+                            answer2: q.answer2,
+                            answer3: q.answer3,
+                            answer4: q.answer4,
+                            correctAnswer: q.correctAnswer,
+                            themeId: newTheme.id,
+                            creatorId: req.currentUser!.id,
+                        },
+                    })
+                )
             );
+
             const quiz = await tx.quiz.create({
                 data: {
                     title,
@@ -170,8 +250,10 @@ export const createQuiz = async (req: Request, res: Response, next: NextFunction
                 },
                 include: { questions: true, theme: true },
             });
+
             return quiz;
         });
+
         res.status(201).json(newQuiz);
     } catch (error) {
         next(error);
@@ -279,22 +361,66 @@ export const submitAnswer = async (req: Request, res: Response, next: NextFuncti
         res.status(401).json({ error: 'Utilisateur non authentifié.' });
         return;
     }
-    const { quizId, questionId, answer } = req.body;
+
+    const { quizId, questionId, mode, answerId, answerText } = req.body;
+
     try {
         const question = await prisma.question.findUnique({ where: { id: questionId } });
-        if (!question) {
-            res.status(404).json({ error: 'Question non trouvée.' });
+        if (!question || typeof question.correctAnswer !== 'number') {
+            res.status(404).json({ error: 'Question non trouvée ou mal configurée.' });
             return;
         }
-        const isCorrect = question.correctAnswer === answer;
-        const scoreToUpdate = isCorrect ? 10 : 0;
 
-        const score = await prisma.score.upsert({
-            where: { userId_quizId: { userId: req.currentUser.id, quizId } },
-            update: { score: { increment: scoreToUpdate } },
-            create: { score: scoreToUpdate, userId: req.currentUser.id, quizId },
+        let isCorrect = false;
+        let scoreToUpdate = 0;
+        const correctAnswerText = (question as any)[`answer${question.correctAnswer}`];
+
+        if (!correctAnswerText) {
+            res.status(500).json({ error: 'Configuration de la réponse correcte invalide.' });
+            return;
+        }
+
+        switch (mode) {
+            case 'cash':
+                if (answerText) {
+                    const similarity = stringSimilarity.compareTwoStrings(
+                        answerText.toLowerCase(),
+                        correctAnswerText.toLowerCase()
+                    );
+                    isCorrect = similarity >= 0.9;
+                    scoreToUpdate = isCorrect ? 5 : 0;
+                }
+                break;
+            case 'carré':
+                if (answerId) {
+                    isCorrect = (answerId === question.correctAnswer);
+                    scoreToUpdate = isCorrect ? 3 : 0;
+                }
+                break;
+            case 'duo':
+                if (answerId) {
+                    isCorrect = (answerId === question.correctAnswer);
+                    scoreToUpdate = isCorrect ? 1 : 0;
+                }
+                break;
+            default:
+                res.status(400).json({ error: 'Mode de réponse non valide.' });
+                return;
+        }
+
+        if (scoreToUpdate > 0) {
+            await prisma.score.upsert({
+                where: { userQuiz: { userId: req.currentUser.id, quizId: Number(quizId) } },
+                update: { score: { increment: scoreToUpdate } },
+                create: { score: scoreToUpdate, userId: req.currentUser.id, quizId: Number(quizId) },
+            });
+        }
+
+        res.status(200).json({ 
+            isCorrect, 
+            correctAnswer: correctAnswerText,
+            score: scoreToUpdate
         });
-        res.status(200).json({ correct: isCorrect, score: score.score });
     } catch (error) {
         next(error);
     }
@@ -306,23 +432,42 @@ export const submitAnswer = async (req: Request, res: Response, next: NextFuncti
 
 export const getGlobalHallOfFame = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const topScores = await prisma.score.groupBy({
+        // Get top 10 users based on summed score
+        const topUsersByTotalScore = await prisma.score.groupBy({
             by: ['userId'],
             _sum: { score: true },
             orderBy: { _sum: { score: 'desc' } },
             take: 10,
         });
-        const users = await prisma.user.findMany({
-            where: { id: { in: topScores.map((s) => s.userId) } },
-            select: { id: true, email: true },
+        const topUserIds = topUsersByTotalScore.map(u => u.userId);
+
+        // Fetch all scores for these top users, including quiz and user details
+        const scoresForTopUsers = await prisma.score.findMany({
+            where: { userId: { in: topUserIds } },
+            include: {
+                user: { select: { id: true, email: true } },
+                quiz: { select: { id: true, title: true } },
+            },
+            orderBy: { score: 'desc' }
         });
-        const userMap = new Map(users.map((u) => [u.id, u.email]));
-        const hallOfFame = topScores.map((s) => ({
-            userId: s.userId,
-            email: userMap.get(s.userId),
-            totalScore: s._sum.score,
-        }));
-        res.json(hallOfFame);
+
+        // Group the scores by user to create the final structure, maintaining the original order
+        const hallOfFameData = topUserIds.map(userId => {
+            const userScores = scoresForTopUsers.filter(score => score.userId === userId);
+            if (userScores.length === 0) return null;
+            
+            return {
+                userId: userId,
+                email: userScores[0].user.email,
+                scores: userScores.map(s => ({
+                    quizId: s.quizId,
+                    quizTitle: s.quiz.title,
+                    score: s.score,
+                }))
+            };
+        }).filter(item => item !== null);
+
+        res.json(hallOfFameData);
     } catch (error) {
         next(error);
     }

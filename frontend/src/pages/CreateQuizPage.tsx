@@ -13,6 +13,7 @@ interface QuestionFormData {
 
 const CreateQuizPage: React.FC = () => {
   const navigate = useNavigate();
+  const [title, setTitle] = useState('');
   const [themeName, setThemeName] = useState('');
   const [questions, setQuestions] = useState<QuestionFormData[]>(
     Array(10).fill(0).map(() => ({
@@ -35,6 +36,10 @@ const CreateQuizPage: React.FC = () => {
   };
 
   const validateForm = () => {
+    if (!title.trim()) {
+      setError('Le titre du quiz est requis.');
+      return false;
+    }
     if (!themeName.trim()) {
       setError('Le nom du thème est requis.');
       return false;
@@ -67,7 +72,8 @@ const CreateQuizPage: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const payload = {
-        themeName,
+        title,
+        theme: themeName,
         questions: questions.map(q => ({ ...q, correctAnswer: Number(q.correctAnswer) })),
       };
 
@@ -104,6 +110,18 @@ const CreateQuizPage: React.FC = () => {
               {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
               {success && <Alert variant="success">{success}</Alert>}
               <Form onSubmit={handleSubmit}>
+                <Form.Group className="mb-4" controlId="quizTitle">
+                  <Form.Label><h3>Titre du Quiz</h3></Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="quizTitle"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    placeholder="Ex: Quiz sur la Révolution Française"
+                  />
+                </Form.Group>
+
                 <Form.Group className="mb-4" controlId="themeName">
                   <Form.Label><h3>Nom du Thème</h3></Form.Label>
                   <Form.Control

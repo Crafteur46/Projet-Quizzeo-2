@@ -1,14 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Table, Spinner, Alert, Card, Button } from 'react-bootstrap';
+import { Container, Table, Spinner, Alert, Card, Button, Accordion } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-interface HallOfFameEntry {
-  email: string;
+// New interfaces to match the updated backend response
+interface QuizScore {
+  quizId: number;
+  quizTitle: string;
   score: number;
 }
 
+interface HallOfFameEntry {
+  userId: number;
+  email: string;
+  scores: QuizScore[];
+}
+
 const HallOfFamePage: React.FC = () => {
-  const [scores, setScores] = useState<HallOfFameEntry[]>([]);
+  // State updated to use the new interface
+  const [hallOfFameData, setHallOfFameData] = useState<HallOfFameEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const isLoggedIn = !!localStorage.getItem('token');
@@ -33,7 +42,7 @@ const HallOfFamePage: React.FC = () => {
         }
 
         const data = await response.json();
-        setScores(data);
+        setHallOfFameData(data); // Set the new data structure
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Une erreur inconnue est survenue');
       } finally {
@@ -80,32 +89,41 @@ const HallOfFamePage: React.FC = () => {
 
           {error && <Alert variant="danger">{error}</Alert>}
 
-          {!loading && !error && (
-            <Table striped bordered hover responsive>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Email</th>
-                  <th>Score Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scores.length > 0 ? (
-                  scores.map((entry, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>{entry.email}</td>
-                      <td>{entry.score}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="text-center">Aucun score enregistré pour le moment.</td>
-                  </tr>
-                )}
-              </tbody>
-            </Table>
-          )}
+          {!loading && !error &&
+            (hallOfFameData.length > 0 ? (
+              <Accordion defaultActiveKey="0">
+                {hallOfFameData.map((entry, index) => (
+                  <Accordion.Item eventKey={String(index)} key={entry.userId}>
+                    <Accordion.Header>
+                      <span className="fw-bold me-3">#{index + 1}</span>
+                      {entry.email}
+                    </Accordion.Header>
+                    <Accordion.Body>
+                      <Table striped bordered hover responsive size="sm">
+                        <thead>
+                          <tr>
+                            <th>Titre du Quiz</th>
+                            <th>Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entry.scores.map((quizScore) => (
+                            <tr key={quizScore.quizId}>
+                              <td>
+                                <Link to={`/quizzes/${quizScore.quizId}`}>{quizScore.quizTitle}</Link>
+                              </td>
+                              <td>{quizScore.score}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </Accordion.Body>
+                  </Accordion.Item>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="text-center">Aucun score enregistré pour le moment.</div>
+            ))}
         </Card.Body>
       </Card>
     </Container>

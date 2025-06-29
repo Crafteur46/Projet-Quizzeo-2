@@ -66,5 +66,5 @@ model Score {
   quizId    Int
   createdAt DateTime @default(now())
 
-  @@unique([userId, quizId])
+  @@unique([userId, quizId], name: "userQuiz")
 }

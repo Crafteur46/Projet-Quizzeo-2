@@ -35,19 +35,28 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticate = void 0;
 const jwt = __importStar(require("jsonwebtoken"));
-const authenticate = (req, res, next) => {
-    const token = req.session?.token;
-    if (!token) {
+const client_1 = require("@prisma/client");
+const prisma = new client_1.PrismaClient();
+const authenticate = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(401).json({ error: 'Access denied. No token provided.' });
         return;
     }
+    const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.currentUser = { id: decoded.userId };
+        const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+        if (!user) {
+            res.status(401).json({ error: 'Invalid token: user not found.' });
+            return;
+        }
+        req.currentUser = user;
         next();
     }
     catch (error) {
         res.status(401).json({ error: 'Invalid token.' });
+        return;
     }
 };
 exports.authenticate = authenticate;
