@@ -9,4 +9,4 @@ Pour la partie frontend, j'utilise les librairies suivantes : bootstrap qui perm
 React qui permet de créer des interfaces utilisateur dynamiques pour des applications web.
 React-router qui permet une navigation dans la webapp. 
 
-Toute cette webapp est conteneurisée dans Docker, ce qui permet de lancer l'ensemble de l'application (frontend, backend et base de données) de manière simple et cohérente sur n'importe quelle machine.
+Toute cette webapp est conteneurisée dans Docker, ce qui permet de lancer l'ensemble de l'application (frontend, backend et base de données) sur n'importe quelle machine.
