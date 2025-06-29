@@ -111,6 +111,83 @@ export const getQuestionsByTheme = async (req: Request, res: Response, next: Nex
     }
 };
 
+export const getCreatedQuestions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.currentUser) {
+        res.status(401).json({ error: 'Utilisateur non authentifié.' });
+        return;
+    }
+    const creatorId = req.currentUser.id;
+
+    try {
+        const questions = await prisma.question.findMany({
+            where: { creatorId },
+            include: {
+                theme: true,
+            },
+        });
+        res.json(questions);
+    } catch (error) {
+        res.status(500).json({ error: 'La récupération des questions créées a échoué.' });
+    }
+};
+
+
+export const updateQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+    const { label, answer1, answer2, answer3, answer4, correctAnswer, themeId } = req.body;
+
+    if (!req.currentUser) {
+        res.status(401).json({ error: 'Utilisateur non authentifié.' });
+        return;
+    }
+
+    try {
+        const question = await prisma.question.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!question || question.creatorId !== req.currentUser.id) {
+            res.status(403).json({ error: 'Action non autorisée.' });
+            return;
+        }
+
+        const updatedQuestion = await prisma.question.update({
+            where: { id: Number(id) },
+            data: { label, answer1, answer2, answer3, answer4, correctAnswer, themeId },
+        });
+        res.json(updatedQuestion);
+    } catch (error) {
+        res.status(500).json({ error: 'La mise à jour de la question a échoué.' });
+    }
+};
+
+export const deleteQuestion = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+
+    if (!req.currentUser) {
+        res.status(401).json({ error: 'Utilisateur non authentifié.' });
+        return;
+    }
+
+    try {
+        const question = await prisma.question.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!question || question.creatorId !== req.currentUser.id) {
+            res.status(403).json({ error: 'Action non autorisée.' });
+            return;
+        }
+
+        await prisma.question.delete({
+            where: { id: Number(id) },
+        });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'La suppression de la question a échoué.' });
+    }
+};
+
 // Quizzes
 export const createQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const { themeName, questions } = req.body;
@@ -224,20 +301,76 @@ export const getCreatedQuizzes = async (req: Request, res: Response, next: NextF
                 creatorId: creatorId,
             },
             include: {
-                theme: true, // Include theme information
-                _count: {
-                    select: { questions: true },
-                },
+                theme: true,
+                questions: true,
             },
         });
-        const quizzesWithQuestionCount = quizzes.map(quiz => ({
-            ...quiz,
-            questionCount: quiz._count.questions,
-        }));
-
-        res.json(quizzesWithQuestionCount);
+        res.json(quizzes);
     } catch (error) {
         res.status(500).json({ error: 'La récupération des quizzes créés a échoué.' });
+    }
+};
+
+export const updateQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+    const { title, themeId, questionIds } = req.body;
+
+    if (!req.currentUser) {
+        res.status(401).json({ error: 'Utilisateur non authentifié.' });
+        return;
+    }
+
+    try {
+        const quiz = await prisma.quiz.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!quiz || quiz.creatorId !== req.currentUser.id) {
+            res.status(403).json({ error: 'Action non autorisée.' });
+            return;
+        }
+
+        const updatedQuiz = await prisma.quiz.update({
+            where: { id: Number(id) },
+            data: {
+                title,
+                theme: { connect: { id: themeId } },
+                questions: {
+                    set: questionIds.map((id: number) => ({ id }))
+                },
+            } as any,
+        });
+        res.json(updatedQuiz);
+    } catch (error) {
+        res.status(500).json({ error: 'La mise à jour du quizz a échoué.' });
+    }
+};
+
+export const deleteQuiz = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const { id } = req.params;
+
+    if (!req.currentUser) {
+        res.status(401).json({ error: 'Utilisateur non authentifié.' });
+        return;
+    }
+
+    try {
+        const quiz = await prisma.quiz.findUnique({
+            where: { id: Number(id) },
+        });
+
+        if (!quiz || quiz.creatorId !== req.currentUser.id) {
+            res.status(403).json({ error: 'Action non autorisée.' });
+            return;
+        }
+
+        await prisma.quiz.delete({
+            where: { id: Number(id) },
+        });
+        res.status(204).send();
+    } catch (error) {
+                console.error('Failed to delete quiz:', error);
+        res.status(500).json({ error: 'La suppression du quizz a échoué.' });
     }
 };
 

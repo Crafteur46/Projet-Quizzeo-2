@@ -35,7 +35,7 @@ model Question {
   answer3       String
   answer4       String
   correctAnswer Int
-  theme         Theme    @relation(fields: [themeId], references: [id])
+  theme         Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
   themeId       Int
   creator       User     @relation("UserQuestions", fields: [creatorId], references: [id])
   creatorId     Int
@@ -46,7 +46,7 @@ model Question {
 
 model Quiz {
   id        Int        @id @default(autoincrement())
-  theme     Theme      @relation(fields: [themeId], references: [id])
+  theme     Theme      @relation(fields: [themeId], references: [id], onDelete: Cascade)
   themeId   Int
   creator   User       @relation("UserQuizzes", fields: [creatorId], references: [id])
   creatorId Int
@@ -61,7 +61,7 @@ model Score {
   score     Int
   user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   quizId    Int
   createdAt DateTime @default(now())
 }
